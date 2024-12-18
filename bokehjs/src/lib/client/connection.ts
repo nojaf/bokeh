@@ -108,15 +108,15 @@ export class ClientConnection {
         this.session?.notify_connection_lost()
       } else {
         if (this.socket?.readyState !== WebSocket.OPEN && this.socket?.readyState !== WebSocket.CONNECTING) {
-            logger.debug(`Attempting to reconnect websocket ${this._number}, ${this._reconnectionAttempts} attempts left`)
-            this._reconnectionAttempts -= 1
-            this.connect().then(() => {
-              logger.info(`Reconnected websocket ${this._number}`)
-              this._reconnectionAttempts = RECONNECTION_ATTEMPTS;
-            }).catch(err => {
-              logger.debug(`Could not reconnect ${this._number}, ${err}`)
-            })
-          }
+          logger.debug(`Attempting to reconnect websocket ${this._number}, ${this._reconnectionAttempts} attempts left`)
+          this._reconnectionAttempts -= 1
+          this.connect().then(() => {
+            logger.info(`Reconnected websocket ${this._number}`)
+            this._reconnectionAttempts = RECONNECTION_ATTEMPTS
+          }).catch(err => {
+            logger.debug(`Could not reconnect ${this._number}, ${err}`)
+          })
+        }
 
       }
     }
