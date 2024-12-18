@@ -8,6 +8,7 @@ import {ClientSession} from "./session"
 
 export const DEFAULT_SERVER_WEBSOCKET_URL = "ws://localhost:5006/ws"
 export const DEFAULT_TOKEN = "eyJzZXNzaW9uX2lkIjogImRlZmF1bHQifQ"
+const RECONNECTION_ATTEMPTS = 5
 
 let _connection_count: number = 0
 
@@ -39,6 +40,7 @@ export class ClientConnection {
 
   closed_permanently: boolean = false
   id: string
+  protected _reconnectionAttempts = RECONNECTION_ATTEMPTS
 
   protected _current_handler: ((message: Message<unknown>) => void) | null = null
   protected _pending_replies: Map<string, PendingReply> = new Map()
@@ -101,23 +103,22 @@ export class ClientConnection {
 
   protected _schedule_reconnect(milliseconds: number): void {
     const retry = () => {
-      // TODO commented code below until we fix reconnection to repull
-      // the document when required. Otherwise, we get a lot of
-      // confusing errors that are causing trouble when debugging.
-      /*
-      if (this.closed_permanently) {
-      */
-      if (!this.closed_permanently) {
+      if (this.closed_permanently || this._reconnectionAttempts <= 0) {
         logger.info(`Websocket connection ${this._number} disconnected, will not attempt to reconnect`)
         this.session?.notify_connection_lost()
-      }
-      return
-      /*
       } else {
-        logger.debug(`Attempting to reconnect websocket ${this._number}`)
-        this.connect()
+        if (this.socket?.readyState !== WebSocket.OPEN && this.socket?.readyState !== WebSocket.CONNECTING) {
+            logger.debug(`Attempting to reconnect websocket ${this._number}, ${this._reconnectionAttempts} attempts left`)
+            this._reconnectionAttempts -= 1
+            this.connect().then(() => {
+              logger.info(`Reconnected websocket ${this._number}`)
+              this._reconnectionAttempts = RECONNECTION_ATTEMPTS;
+            }).catch(err => {
+              logger.debug(`Could not reconnect ${this._number}, ${err}`)
+            })
+          }
+
       }
-      */
     }
     setTimeout(retry, milliseconds)
   }
@@ -228,6 +229,7 @@ export class ClientConnection {
     this._pending_replies.clear()
 
     if (!this.closed_permanently) {
+      logger.debug(`Pending schedule_reconnect for ${this._number}`)
       this._schedule_reconnect(2000)
     }
 
