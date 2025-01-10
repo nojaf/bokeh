@@ -44,9 +44,13 @@ export class ClientSession {
     }
   }
 
+  // TODO: refactor to connection_lost_permanently
   notify_connection_lost(): void {
     this.document.event_manager.send_event(new ConnectionLost())
   }
+
+  // TODO: notify_connection_retry ?
+  // data: time (ms) to next retry, connection attempt number
 
   close(): void {
     this._connection.close()

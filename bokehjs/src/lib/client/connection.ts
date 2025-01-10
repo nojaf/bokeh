@@ -72,7 +72,8 @@ export class ClientConnection {
         versioned_url += `?${this.args_string}`
       }
 
-      this.socket = new WebSocket(versioned_url, ["bokeh", this.token])
+      this.socket = new WebSocket(versioned_url, ["bokeh", this.token]);
+      window.theSocket = this.socket;
 
       return new Promise((resolve, reject) => {
         // "arraybuffer" gives us binary data we can look at;
@@ -120,7 +121,12 @@ export class ClientConnection {
 
       }
     }
+    // TODO: increment milisecond after each retry (exponential backoff)
+    // TODO: maybe also show notification we are retrying (which attempt, next attempt in x ms, ...)
+    
     setTimeout(retry, milliseconds)
+
+    // TODO: after retries ended, show a button to try one last reconnect.
   }
 
   send(message: Message<unknown>): void {
