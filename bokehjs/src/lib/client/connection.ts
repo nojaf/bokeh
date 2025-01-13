@@ -9,6 +9,7 @@ import {ClientSession} from "./session"
 export const DEFAULT_SERVER_WEBSOCKET_URL = "ws://localhost:5006/ws"
 export const DEFAULT_TOKEN = "eyJzZXNzaW9uX2lkIjogImRlZmF1bHQifQ"
 const RECONNECTION_ATTEMPTS = 5
+const RECONNECT_BASE_DELAY = 2000
 
 let _connection_count: number = 0
 
@@ -72,8 +73,10 @@ export class ClientConnection {
         versioned_url += `?${this.args_string}`
       }
 
-      this.socket = new WebSocket(versioned_url, ["bokeh", this.token]);
-      window.theSocket = this.socket;
+      this.socket = new WebSocket(versioned_url, ["bokeh", this.token])
+      // TODO: remove this!!
+      // @ts-ignore
+      window.theSocket = this.socket
 
       return new Promise((resolve, reject) => {
         // "arraybuffer" gives us binary data we can look at;
@@ -109,21 +112,22 @@ export class ClientConnection {
         this.session?.notify_connection_lost()
       } else {
         if (this.socket?.readyState !== WebSocket.OPEN && this.socket?.readyState !== WebSocket.CONNECTING) {
-          logger.debug(`Attempting to reconnect websocket ${this._number}, ${this._reconnectionAttempts} attempts left`)
-          this._reconnectionAttempts -= 1
+          logger.debug(`Attempting to reconnect websocket ${this._number} in ${milliseconds}ms, ${this._reconnectionAttempts} attempts left`)
+
           this.connect().then(() => {
             logger.info(`Reconnected websocket ${this._number}`)
             this._reconnectionAttempts = RECONNECTION_ATTEMPTS
           }).catch(err => {
             logger.debug(`Could not reconnect ${this._number}, ${err}`)
           })
+
+          this._reconnectionAttempts -= 1
         }
 
       }
     }
-    // TODO: increment milisecond after each retry (exponential backoff)
     // TODO: maybe also show notification we are retrying (which attempt, next attempt in x ms, ...)
-    
+
     setTimeout(retry, milliseconds)
 
     // TODO: after retries ended, show a button to try one last reconnect.
@@ -227,6 +231,11 @@ export class ClientConnection {
     }
   }
 
+  /* The reconnect delay exponentially increases after each attempt */
+  private _reconnect_delay(): number {
+    return RECONNECT_BASE_DELAY * 2**(RECONNECTION_ATTEMPTS - this._reconnectionAttempts - 1)
+  }
+
   protected _on_close(event: CloseEvent, reject: Rejecter): void {
     logger.info(`Lost websocket ${this._number} connection, ${event.code} (${event.reason})`)
     this.socket = null
@@ -236,7 +245,7 @@ export class ClientConnection {
 
     if (!this.closed_permanently) {
       logger.debug(`Pending schedule_reconnect for ${this._number}`)
-      this._schedule_reconnect(2000)
+      this._schedule_reconnect(this._reconnect_delay())
     }
 
     reject(new Error(`Lost websocket connection, ${event.code} (${event.reason})`))
